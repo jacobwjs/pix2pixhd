@@ -22,6 +22,7 @@
 
 import os
 from collections.abc import Iterable
+import glob
 
 import torch
 import numpy as np
@@ -152,3 +153,69 @@ class CityscapesDataset(torch.utils.data.Dataset):
             torch.stack(insts, dim=0),
             torch.stack(bounds, dim=0),
         )
+
+    
+    
+class StyleGANFaces(torch.utils.data.Dataset):
+    '''
+    Implements dataset with preprocessing for image-to-image dataset 
+    generated from StyleGAN2.
+    '''
+
+    def __init__(self,
+                 path_A,
+                 path_B,
+                 path_AtoB,
+                 path_BtoA,
+                 ext=".png",
+                 target_width=256):
+        super().__init__()
+        
+        self.path_A = path_A
+        self.path_B = path_B
+        self.path_AtoB = path_AtoB
+        self.path_BtoA = path_BtoA
+
+        self.files_A = sorted(glob.glob(f'{path_A}/*{ext}'))
+        self.files_B = sorted(glob.glob(f'{path_B}/*{ext}'))
+        self.files_AtoB = sorted(glob.glob(f'{path_AtoB}/*{ext}'))
+        self.files_BtoA = sorted(glob.glob(f'{path_BtoA}/*{ext}'))
+        assert len(self.files_A) == len(self.files_B) == len(self.files_AtoB) == len(self.files_BtoA)
+
+        # Initialize transforms for the real color image
+        self.img_transforms = transforms.Compose([
+            transforms.Lambda(lambda img: scale_width(img, target_width, Image.BICUBIC)),
+            transforms.Lambda(lambda img: np.array(img)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ])
+
+        
+    def __getitem__(self, idx: int):
+        img_A = self.img_transforms(Image.open(self.files_A[idx]))
+        img_B = self.img_transforms(Image.open(self.files_B[idx]))
+        img_AtoB = self.img_transforms(Image.open(self.files_AtoB[idx]))
+        img_BtoA = self.img_transforms(Image.open(self.files_BtoA[idx]))
+        
+        return (img_A, img_B, img_AtoB, img_BtoA)
+
+    
+    def __len__(self):
+        '''All have been asserted to be equal length, so just return one'''
+        return len(self.files_A)
+
+
+#     @staticmethod
+#     def collate_fn(batch):
+#         imgs, labels, insts, bounds = [], [], [], []
+#         for (x, l, i, b) in batch:
+#             imgs.append(x)
+#             labels.append(l)
+#             insts.append(i)
+#             bounds.append(b)
+#         return (
+#             torch.stack(imgs, dim=0),
+#             torch.stack(labels, dim=0),
+#             torch.stack(insts, dim=0),
+#             torch.stack(bounds, dim=0),
+#         )

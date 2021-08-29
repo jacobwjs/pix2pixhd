@@ -43,6 +43,8 @@ def parse_config(config):
         config.generator.in_channels = sum(config.generator.in_channels)
     if isinstance(config.discriminator.in_channels, ListConfig):
         config.discriminator.in_channels = sum(config.discriminator.in_channels)
+    if isinstance(config.encoder.in_channels, ListConfig):
+        config.encoder.in_channels = sum(config.encoder.in_channels)
     return config
 
 

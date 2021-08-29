@@ -130,7 +130,8 @@ class LocalEnhancer(nn.Module):
 
         # Initialize global generator without its input and output layers
         self.g1 = GlobalGenerator(
-            in_channels, out_channels, base_channels=global_base_channels, fb_blocks=global_fb_blocks, res_blocks=global_res_blocks,
+            in_channels, out_channels, base_channels=global_base_channels,
+            fb_blocks=global_fb_blocks, res_blocks=global_res_blocks,
         ).g1
 
         self.g2 = nn.ModuleList()
@@ -158,7 +159,8 @@ class LocalEnhancer(nn.Module):
                 *[ResidualBlock(2 * base_channels) for _ in range(local_res_blocks)],
 
                 # Backend blocks
-                nn.ConvTranspose2d(2 * base_channels, base_channels, kernel_size=3, stride=2, padding=1, output_padding=1), 
+                nn.ConvTranspose2d(2 * base_channels, base_channels,
+                                   kernel_size=3, stride=2, padding=1, output_padding=1), 
                 nn.InstanceNorm2d(base_channels, affine=False),
                 nn.ReLU(inplace=True),
 
@@ -345,9 +347,10 @@ class Encoder(nn.Module):
 
         return x_mean
 
-    def forward(self, x, inst):
+    def forward(self, x, inst=None):
         x = self.layers(x)
-        x = self.instancewise_average_pooling(x, inst)
+        if inst:
+            x = self.instancewise_average_pooling(x, inst)
         return x
 
 
