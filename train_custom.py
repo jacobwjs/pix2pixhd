@@ -141,6 +141,8 @@ def train(
     train_loader, val_loader,
     encoder, generator, discriminator, vgg, lpips):
     
+    device = args.device
+    
     if args.high_res:
         g_optimizer = torch.optim.Adam(
             list(generator.parameters()), **config.optim,
@@ -357,6 +359,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     
     parent_path = args.path_data # "../dataset/image-to-image-50k-256px"
+    print("Training on", parent_path)
     train_dataset = StyleGANFaces(
         path_A= f"{parent_path}/train/imagesA",
         path_B= f"{parent_path}/train/imagesB",
@@ -411,6 +414,10 @@ if __name__ == "__main__":
     # summary(encoder, (3, 256, 256))
     # summary(generator, (6, 256, 256))
     # summary(discriminator, (3, 256, 256))
+    
+    config.args = OmegaConf.to_yaml(OmegaConf.from_cli())
+    fp = f'{log_dir}/training_config.yaml'
+    OmegaConf.save(config=config, f=fp)
     
     train(
         args,

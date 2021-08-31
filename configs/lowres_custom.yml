@@ -65,4 +65,9 @@ train:
     save_ckpt_every: 1 # checkpoint model(s) every multiple epoch.
     snapshot_every_n_examples: 10000 # Save output of model after every multiple number of examples
 
-resume_checkpoint: null
+# resume_checkpoint: null
+resume_checkpoint: ./logs/2021.08.30-07:40:42/ckpt_epoch3.pt # middle-fine
+# resume_checkpoint: .(/logs/2021.08.30-07:39:35/ckpt_epoch2.pt # coarse-fine
+# resume_checkpoint: ./logs/2021.08.30-05:50:37/ckpt_epoch4.pt # fine
+# resume_checkpoint: ./logs/2021.08.30-05:48:46/ckpt_epoch4.pt # middle
+# resume_checkpoint: ./logs/2021.08.30-05:40:29/ckpt_epoch4.pt # coarse
