@@ -256,7 +256,7 @@ class Pix2PixHD(pl.LightningModule):
             res = torch.cat(
                 [img_A, img_B, img_AtoB, x_fake_forward, features_forward, img_BtoA, x_fake_back, features_back],
                 dim=0
-            ).cpu()
+            ).detach().cpu()
             torchvision.utils.save_image(
                 res,
                 fp=f'{self.trainer.logger.log_dir}/snapshot_seen{self.num_seen_examples}_epoch{self.current_epoch}.png',
@@ -383,7 +383,7 @@ if __name__ == "__main__":
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=args.num_workers,
         collate_fn=None,
         pin_memory=False,
@@ -399,7 +399,7 @@ if __name__ == "__main__":
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=1 if args.high_res else 8,
-        shuffle=True,
+        shuffle=False,
         num_workers=args.num_workers,
         collate_fn=None,
         pin_memory=False,
@@ -430,28 +430,39 @@ if __name__ == "__main__":
         auto_select_gpus=True,
         accelerator="ddp",
         plugins=DDPPlugin(find_unused_parameters=False),
-#         plugins=DDPSpawnPlugin(find_unused_parameters=False),
         precision=args.precision,
         weights_summary="top",
         logger=logger,
         max_epochs=config.train.epochs,
         callbacks=[checkpoint_callback],
-#         val_check_interval=0.25, # Run validation every 0.25 of an epoch
-        limit_train_batches=50,
-        limit_val_batches=10,
-#         fast_dev_run=True
+        val_check_interval=0.25, # Run validation every 0.25 of an epoch
     ) 
-    
-    print("Trainer.logger", trainer.logger)
-    print("Trainer.logger.save_dir", trainer.logger.save_dir)
-    print("Trainer.logger.version", trainer.logger.version)
-    print("Trainer.logger.sub_dir", trainer.logger.sub_dir)
-    print("Trainer.logger.log_dir", trainer.logger.log_dir)
-    print("Trainer.logger.root_dir", trainer.logger.root_dir)
-    print("Trainer.default_root_dir", trainer.default_root_dir)
 
-# #     fp = f'{trainer.logger.root_dir}/training_config.yaml'
-# #     OmegaConf.save(config=config, f=fp)
+#     # For testing.
+#     #
+#     trainer = Trainer(
+#         gpus=args.gpu_ids, # specify which GPUs to use explicitly.
+#         auto_select_gpus=True,
+#         accelerator="ddp",
+#         plugins=DDPPlugin(find_unused_parameters=False),
+#         precision=args.precision,
+#         weights_summary="top",
+#         logger=logger,
+#         max_epochs=config.train.epochs,
+#         callbacks=[checkpoint_callback],
+#         limit_train_batches=0.2,
+#         limit_val_batches=0.2,        
+#     #         fast_dev_run=True
+#     ) 
+    
+#     print("Trainer.logger", trainer.logger)
+#     print("Trainer.logger.save_dir", trainer.logger.save_dir)
+#     print("Trainer.logger.version", trainer.logger.version)
+#     print("Trainer.logger.sub_dir", trainer.logger.sub_dir)
+#     print("Trainer.logger.log_dir", trainer.logger.log_dir)
+#     print("Trainer.logger.root_dir", trainer.logger.root_dir)
+#     print("Trainer.default_root_dir", trainer.default_root_dir)
+
       
     # Setup the model.    
     #
@@ -464,6 +475,11 @@ if __name__ == "__main__":
         train_dataloader,
         val_dataloader
     )
+    
+    # Explicitly save the training configuration file.
+    #
+    fp = f'{trainer.logger.log_dir}/training_config.yaml'
+    OmegaConf.save(config=config, f=fp)
 
     
 
