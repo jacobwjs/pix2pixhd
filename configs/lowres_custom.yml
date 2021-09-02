@@ -1,25 +1,29 @@
-target_width: &target_width 1024    # target width of cityscapes images
-n_classes: &n_classes 35            # number of object classes
+# target_width: &target_width 1024    # target width of cityscapes images
+# n_classes: &n_classes 35            # number of object classes
+# n_features: &n_features 3           # number of feature maps from encoder
+# rgb: &rgb 3                         # number of RGB channels
+
+target_width: &target_width 256    # target width of stylegan2 images
 n_features: &n_features 3           # number of feature maps from encoder
 rgb: &rgb 3                         # number of RGB channels
 
 
-train_dataset:
-    _target_: modules.dataset.CityscapesDataset
-    paths: [data/gtFine_trainvaltest/gtFine/train, data/leftImg8bit_trainvaltest/leftImg8bit/train]
-    target_width: *target_width
-    n_classes: *n_classes
+# train_dataset:
+#     _target_: modules.dataset.CityscapesDataset
+#     paths: [data/gtFine_trainvaltest/gtFine/train, data/leftImg8bit_trainvaltest/leftImg8bit/train]
+#     target_width: *target_width
+#     n_classes: *n_classes
 
 train_dataloader:
     batch_size: 1
     shuffle: true
     pin_memory: true
 
-val_dataset:
-    _target_: modules.dataset.CityscapesDataset
-    paths: [data/gtFine_trainvaltest/gtFine/val, data/leftImg8bit_trainvaltest/leftImg8bit/val]
-    target_width: *target_width
-    n_classes: *n_classes
+# val_dataset:
+#     _target_: modules.dataset.CityscapesDataset
+#     paths: [data/gtFine_trainvaltest/gtFine/val, data/leftImg8bit_trainvaltest/leftImg8bit/val]
+#     target_width: *target_width
+#     n_classes: *n_classes
 
 val_dataloader:
     batch_size: 8
@@ -59,14 +63,14 @@ optim:
     betas: [0.5, 0.999]
 
 train:
-    epochs: 30
-    decay_after: 15
+    epochs: 50
+    decay_after: 25
     log_dir: "./logs"
-    save_ckpt_every: 1 # checkpoint model(s) every multiple epoch.
+    ckpt_every_n: 5 # checkpoint model(s) every multiple epoch.
     snapshot_every_n_examples: 10000 # Save output of model after every multiple number of examples
 
-# resume_checkpoint: null
-resume_checkpoint: ./logs/2021.08.30-07:40:42/ckpt_epoch3.pt # middle-fine
+resume_checkpoint: null
+# resume_checkpoint: ./logs/2021.08.30-07:40:42/ckpt_epoch3.pt # middle-fine
 # resume_checkpoint: .(/logs/2021.08.30-07:39:35/ckpt_epoch2.pt # coarse-fine
 # resume_checkpoint: ./logs/2021.08.30-05:50:37/ckpt_epoch4.pt # fine
 # resume_checkpoint: ./logs/2021.08.30-05:48:46/ckpt_epoch4.pt # middle
