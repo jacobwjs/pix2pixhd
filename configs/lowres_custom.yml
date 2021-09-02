@@ -68,6 +68,12 @@ train:
     log_dir: "./logs"
     ckpt_every_n: 5 # checkpoint model(s) every multiple epoch.
     snapshot_every_n_examples: 10000 # Save output of model after every multiple number of examples
+    
+losses:
+    lambda_adv: 1.0     # advaserial loss hyperparam
+    lambda_fm: 10.      # feature matching loss hyperparam
+    lambda_vgg: 10.     # vgg loss hyperparam
+    lambda_lpips: 2.    # lpips loss hyperparam
 
 resume_checkpoint: null
 # resume_checkpoint: ./logs/2021.08.30-07:40:42/ckpt_epoch3.pt # middle-fine
