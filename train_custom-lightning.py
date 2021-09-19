@@ -34,12 +34,10 @@ from PIL import Image
 from modules.dataset import StyleGANFaces
 # from modules.loss import Pix2PixHDLoss
 from modules.networks import VGG19
+from modules.networks import Encoder
 from utils import parse_config, get_lr_lambda, weights_init, freeze_encoder, show_tensor_images
 
 import lpips as LPIPS
-
-
-
 
 
             
@@ -49,12 +47,13 @@ class Pix2PixHD(pl.LightningModule):
         
         self.save_hyperparameters()
         self.config = config
-        
-        self.encoder = instantiate(config.encoder).to(config.device).apply(weights_init)
-        self.generator = instantiate(config.generator).to(config.device).apply(weights_init)
-        self.discriminator = instantiate(config.discriminator).to(config.device).apply(weights_init)
-        self.vgg = VGG19().to(config.device)
-        self.lpips = LPIPS.LPIPS(net='alex').to(config.device)
+            
+#         self.encoder = instantiate(config.encoder).apply(weights_init)
+        self.encoder = Encoder()
+        self.generator = instantiate(config.generator).apply(weights_init)
+        self.discriminator = instantiate(config.discriminator).apply(weights_init)
+        self.vgg = VGG19()
+        self.lpips = LPIPS.LPIPS(net='vgg')
         
         self.automatic_optimization = False
         
@@ -72,7 +71,7 @@ class Pix2PixHD(pl.LightningModule):
         self.lambda2 = self.lambda2 / scale
         
         self.num_seen_examples = 0 # How many data examples have we seen (i.e. images)
-        
+
         
     def forward(self, img_A, img_B):
         feature_map = self.encoder(torch.cat((img_A, img_B), dim=1))
@@ -165,33 +164,65 @@ class Pix2PixHD(pl.LightningModule):
         # Compute gradients after each tranfer. Respects batch_size.
         # ------------------------------------------------------------------
         #
-        # Transfer A -> B
-        #
-        g_loss, d_loss, _, _ = self.transfer(X=img_A, Y=img_B, XtoY=img_AtoB)
-        g_loss = g_loss.mean()
-        d_loss = d_loss.mean()
-        self.num_seen_examples += img_A.shape[0]
-        g_optimizer.zero_grad()
-        self.manual_backward(g_loss)
-        g_optimizer.step()
-        d_optimizer.zero_grad()
-        self.manual_backward(d_loss)
-        d_optimizer.step()        
-        self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)
         
-        # Transfer B -> A
+        # Self transfer. Enforce self reconstruction.
         #
-        g_loss, d_loss, _, _ = self.transfer(X=img_B, Y=img_A, XtoY=img_BtoA)
-        g_loss = g_loss.mean()
-        d_loss = d_loss.mean()
-        self.num_seen_examples += img_A.shape[0]
-        g_optimizer.zero_grad()
-        self.manual_backward(g_loss)
-        g_optimizer.step()
-        d_optimizer.zero_grad()
-        self.manual_backward(d_loss)
-        d_optimizer.step()        
-        self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)        
+        if (batch_idx % 10) == 0:
+            g_loss, d_loss, x_fake, _ = self.transfer(X=img_A, Y=img_A, XtoY=img_A)
+#             g_loss += F.l1_loss(x_fake, img_A)
+            g_loss = g_loss.mean()
+            d_loss = d_loss.mean()
+            self.num_seen_examples += img_A.shape[0]
+            g_optimizer.zero_grad()
+            self.manual_backward(g_loss)
+            g_optimizer.step()
+            d_optimizer.zero_grad()
+            self.manual_backward(d_loss)
+            d_optimizer.step()        
+            self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)
+            
+            g_loss, d_loss, x_fake, _ = self.transfer(X=img_B, Y=img_B, XtoY=img_B)
+#             g_loss += F.l1_loss(x_fake, img_B)
+            g_loss = g_loss.mean()
+            d_loss = d_loss.mean()
+            self.num_seen_examples += img_A.shape[0]
+            g_optimizer.zero_grad()
+            self.manual_backward(g_loss)
+            g_optimizer.step()
+            d_optimizer.zero_grad()
+            self.manual_backward(d_loss)
+            d_optimizer.step()        
+            self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)
+        else:
+            # Transfer A -> B
+            #
+            g_loss, d_loss, x_fake, _ = self.transfer(X=img_A, Y=img_B, XtoY=img_AtoB)
+            g_loss += 0.5 * F.l1_loss(x_fake, img_AtoB)
+            g_loss = g_loss.mean()
+            d_loss = d_loss.mean()
+            self.num_seen_examples += img_A.shape[0]
+            g_optimizer.zero_grad()
+            self.manual_backward(g_loss)
+            g_optimizer.step()
+            d_optimizer.zero_grad()
+            self.manual_backward(d_loss)
+            d_optimizer.step()        
+            self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)
+
+            # Transfer B -> A
+            #
+            g_loss, d_loss, x_fake, _ = self.transfer(X=img_B, Y=img_A, XtoY=img_BtoA)
+            g_loss += 0.5 * F.l1_loss(x_fake, img_BtoA)
+            g_loss = g_loss.mean()
+            d_loss = d_loss.mean()
+            self.num_seen_examples += img_A.shape[0]
+            g_optimizer.zero_grad()
+            self.manual_backward(g_loss)
+            g_optimizer.step()
+            d_optimizer.zero_grad()
+            self.manual_backward(d_loss)
+            d_optimizer.step()        
+            self.log_dict({"g_loss": g_loss, "d_loss": d_loss}, prog_bar=True, logger=True)        
         
         
 #         # Compute gradients and step after both A -> B and B -> A have occurred.
@@ -222,12 +253,12 @@ class Pix2PixHD(pl.LightningModule):
 #         self.log("g_loss", g_total, prog_bar=True)
         
         
-        # Step scheduler every `n` epochs
-        #
-        n = 1
-        if self.trainer.is_last_batch and (self.trainer.current_epoch + 1) % n == 0:
-            for scheduler in self.lr_schedulers():
-                scheduler.step()
+#         # Step scheduler every `n` epochs
+#         #
+#         n = 1
+#         if self.trainer.is_last_batch and (self.trainer.current_epoch + 1) % n == 0:
+#             for scheduler in self.lr_schedulers():
+#                 scheduler.step()
         
     
     def validation_step(self, batch, batch_idx):
@@ -242,8 +273,8 @@ class Pix2PixHD(pl.LightningModule):
             g_loss_back, d_loss_back, x_fake_back, features_back = self.transfer(X=img_B, Y=img_A, XtoY=img_BtoA)
     
     
-        val_g_loss = g_loss_forward.mean() + g_loss_back.mean()
-        val_d_loss = d_loss_forward.mean() + g_loss_back.mean()
+        val_g_loss = (g_loss_forward.mean() + g_loss_back.mean()) / 2
+        val_d_loss = (d_loss_forward.mean() + g_loss_back.mean()) / 2
         self.log("val_g_loss", val_g_loss, prog_bar=True, logger=True)
         self.log("val_d_loss", val_d_loss, prog_bar=True, logger=True)
 #         self.log("dis_loss", dis_loss, prog_bar=True)
@@ -252,7 +283,7 @@ class Pix2PixHD(pl.LightningModule):
         # Save snapshot of results on validation data
         #
 #         if self.trainer.is_last_batch:
-        if (batch_idx == 0) and (self.local_rank == self.config.gpu_ids[0]):
+        if (batch_idx == 0) and (self.local_rank == 0):
             res = torch.cat(
                 [img_A, img_B, img_AtoB, x_fake_forward, features_forward, img_BtoA, x_fake_back, features_back],
                 dim=0
@@ -354,9 +385,7 @@ if __name__ == "__main__":
     
     # Setup logging.
     #
-#     log_dir = os.path.join(config.train.log_dir, datetime.now().strftime('%Y.%m.%d-%H:%M:%S'))
     log_dir = f"{config.train.log_dir}/{args.tag}"
-#     os.makedirs(log_dir, mode=0o775, exist_ok=True)
     config.log_dir = log_dir
     logger = TensorBoardLogger(
         f"{log_dir}/tb_logs",
@@ -383,7 +412,7 @@ if __name__ == "__main__":
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=args.num_workers,
         collate_fn=None,
         pin_memory=False,
@@ -399,7 +428,7 @@ if __name__ == "__main__":
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=1 if args.high_res else 8,
-        shuffle=False,
+        shuffle=True,
         num_workers=args.num_workers,
         collate_fn=None,
         pin_memory=False,
@@ -419,8 +448,7 @@ if __name__ == "__main__":
         filename="pix2pixhd-{epoch:03d}" + f"-{args.tag}",
         every_n_epochs=1, #config.train.ckpt_every_n
     )
-    
-    print("checkpoint", checkpoint_callback.dirpath)
+#     print("checkpoint", checkpoint_callback.dirpath)
     
     # Define the trainer.
     #
@@ -484,7 +512,13 @@ if __name__ == "__main__":
     
 
 
+# Example usage:
+# ---------------------
+#
 
+# - 16-bit precision
+#
+# python -W ignore train_custom-lightning.py --gpu_ids=1,2,3 --config=./configs/lowres_custom.yml --path_data=../dataset/image-to-image-coarse-50k-256px --batch_size=1 --tag=coarse --precision=16 --experiment=encoder
 
 
 
